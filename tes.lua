@@ -1,93 +1,90 @@
+--[[ 
+    Advanced Universal Admin Panel (Stable & Customizable)
+    - Gunakan TextBox untuk kustom angka
+    - Fly menggunakan Kamera (WASD support)
+]]
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
+local Camera = workspace.CurrentCamera
 
--- [UI SETUP]
+-- UI Setup
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 local MainFrame = Instance.new("ScrollingFrame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 240, 0, 450)
-MainFrame.Position = UDim2.new(0.5, -120, 0.5, -225)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.Size = UDim2.new(0, 250, 0, 450)
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -225)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Visible = false
-MainFrame.CanvasSize = UDim2.new(0,0,3,0)
 Instance.new("UIListLayout", MainFrame).Padding = UDim.new(0, 5)
 
--- [FUNGSI UI]
+-- Fungsi Input Kustom
 local function createInput(placeholder, callback)
     local box = Instance.new("TextBox", MainFrame)
-    box.Size = UDim2.new(1, -10, 0, 40)
+    box.Size = UDim2.new(1, -10, 0, 30)
     box.PlaceholderText = placeholder
-    box.Text = ""
-    box.FocusLost:Connect(function(enter) if enter then callback(tonumber(box.Text)) end end)
+    box.FocusLost:Connect(function(enterPressed) if enterPressed then callback(tonumber(box.Text)) end end)
 end
 
--- [LOGIC FITUR]
-local FlySpeed = 50
-local Flying = false
-
--- Fly (Dengan kontrol arah kamera)
-local function startFly()
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp = char:WaitForChild("HumanoidRootPart")
-    local bv = Instance.new("BodyVelocity", hrp); bv.Name = "FlyV"
-    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    
-    local conn = RunService.RenderStepped:Connect(function()
-        if not Flying then bv:Destroy(); return end
-        local cam = workspace.CurrentCamera.CFrame.LookVector
-        local move = Vector3.new(0,0,0)
-        -- Input sederhana (bisa diganti dengan deteksi WASD)
-        bv.Velocity = cam * FlySpeed
-    end)
+-- 1. Fly Dinamis (WASD Support)
+local flying = false
+local flySpeed = 50
+local function toggleFly()
+    flying = not flying
+    if flying then
+        local bv = Instance.new("BodyVelocity", LocalPlayer.Character.HumanoidRootPart)
+        bv.Name = "FlyVelocity"
+        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        
+        RunService.RenderStepped:Connect(function()
+            if not flying then bv:Destroy(); return end
+            local moveDir = Vector3.new(0, 0, 0)
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += Camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= Camera.CFrame.LookVector end
+            bv.Velocity = moveDir * flySpeed
+        end)
+    end
 end
 
--- UI Controls
-local ToggleBtn = Instance.new("TextButton", ScreenGui); ToggleBtn.Size = UDim2.new(0, 100, 0, 40); ToggleBtn.Text = "Menu"
-ToggleBtn.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
-
--- Create Buttons
-local function createButton(text, func)
-    local b = Instance.new("TextButton", MainFrame); b.Size = UDim2.new(1, -10, 0, 40); b.Text = text; b.MouseButton1Click:Connect(func)
-end
-
-createInput("Set Speed", function(v) LocalPlayer.Character.Humanoid.WalkSpeed = v end)
-createInput("Set JumpPower", function(v) LocalPlayer.Character.Humanoid.JumpPower = v end)
-
-createButton("Toggle Fly", function() 
-    Flying = not Flying
-    if Flying then startFly() end
-end)
-
-local Noc = false
-createButton("Toggle NoClip", function()
-    Noc = not Noc
-    RunService.Stepped:Connect(function()
-        if Noc and LocalPlayer.Character then
-            for _,p in pairs(LocalPlayer.Character:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
-        end
-    end)
-end)
-
-createButton("TP ke Player Terdekat", function()
-    local closest, dist = nil, math.huge
-    for _,p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character then
-            local d = (p.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-            if d < dist then closest = p.Character; dist = d end
+-- 2. NoClip (Stabil)
+local noclip = false
+RunService.Stepped:Connect(function()
+    if noclip and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
         end
     end
-    if closest then LocalPlayer.Character.HumanoidRootPart.CFrame = closest.HumanoidRootPart.CFrame end
 end)
 
-createButton("Nempel (Lock)", function()
-    local target = Players:GetPlayers()[math.random(2, #Players:GetPlayers())].Character
-    local conn; conn = RunService.RenderStepped:Connect(function()
-        if target and target:FindFirstChild("HumanoidRootPart") then
-            LocalPlayer.Character.HumanoidRootPart.CFrame = target.HumanoidRootPart.CFrame
-        else conn:Disconnect() end
-    end)
+-- 3. Nempel (Toggleable)
+local sticky = false
+local stickyTarget = nil
+RunService.RenderStepped:Connect(function()
+    if sticky and stickyTarget and LocalPlayer.Character then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = stickyTarget.CFrame
+    end
 end)
+
+-- [IMPLEMENTASI UI]
+local function createButton(text, cb)
+    local b = Instance.new("TextButton", MainFrame)
+    b.Size = UDim2.new(1, -10, 0, 35); b.Text = text; b.MouseButton1Click:Connect(cb)
+end
+
+createButton("Toggle Fly", toggleFly)
+createInput("Set Fly Speed (Default 50)", function(val) flySpeed = val or 50 end)
+createButton("Toggle NoClip", function() noclip = not noclip end)
+createButton("Speed: 100", function() LocalPlayer.Character.Humanoid.WalkSpeed = 100 end)
+
+createButton("Nempel (Target: First Player)", function()
+    sticky = not sticky
+    stickyTarget = Players:GetPlayers()[2].Character.HumanoidRootPart -- Contoh target player ke-2
+end)
+
+-- Toggle Menu
+local toggleBtn = Instance.new("TextButton", ScreenGui)
+toggleBtn.Size = UDim2.new(0, 100, 0, 40); toggleBtn.Text = "Menu"
+toggleBtn.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
