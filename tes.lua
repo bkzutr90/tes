@@ -1,89 +1,127 @@
+--[[ 
+    Advanced Universal Admin Panel
+    Arsitektur: Modular, Clean UI, Input-Driven
+]]
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
+local LP = LocalPlayer
 
--- [UI BUILDER] 
+-- [UI SETUP]
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
-local MainFrame = Instance.new("ScrollingFrame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 250, 0, 450); MainFrame.Position = UDim2.new(0.5, -125, 0.5, -225)
-MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35); MainFrame.Active = true; MainFrame.Draggable = true
-Instance.new("UIListLayout", MainFrame).Padding = UDim.new(0, 5)
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 250, 0, 500)
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -250)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Visible = false
 
--- [STATE DATA]
-local States = { Fly = false, FlySpeed = 50, NoClip = false, Nempel = nil, Grab = nil }
+local UIList = Instance.new("UIListLayout", MainFrame)
+UIList.Padding = UDim.new(0, 5)
+UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
-local function createInput(text, default, callback)
+-- Helper untuk Membuat Elemen UI
+local function createInput(placeholder, callback)
     local box = Instance.new("TextBox", MainFrame)
-    box.Size = UDim2.new(1, -10, 0, 30); box.PlaceholderText = text; box.Text = tostring(default)
-    box.FocusLost:Connect(function() callback(tonumber(box.Text)) end)
+    box.Size = UDim2.new(0.9, 0, 0, 35)
+    box.PlaceholderText = placeholder
+    box.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    box.TextColor3 = Color3.new(1, 1, 1)
+    box.FocusLost:Connect(function(enter) if enter then callback(box.Text) end end)
+    return box
 end
 
--- [CORE LOGIC]
--- FLY (Custom Speed)
-RunService.RenderStepped:Connect(function()
-    if States.Fly and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local hrp = LocalPlayer.Character.HumanoidRootPart
-        hrp.Velocity = workspace.CurrentCamera.CFrame.LookVector * States.FlySpeed
-    end
-end)
-
--- NOCLIP
-RunService.Stepped:Connect(function()
-    if States.NoClip and LocalPlayer.Character then
-        for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
-            if v:IsA("BasePart") then v.CanCollide = false end
-        end
-    end
-end)
-
--- NEMPEL (Backend)
-RunService.RenderStepped:Connect(function()
-    if States.Nempel and States.Nempel.Character then
-        local targetHrp = States.Nempel.Character:FindFirstChild("HumanoidRootPart")
-        if targetHrp then LocalPlayer.Character.HumanoidRootPart.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 2) end
-    end
-end)
-
--- [UI ELEMENTS]
-local function addButton(text, func)
-    local btn = Instance.new("TextButton", MainFrame); btn.Size = UDim2.new(1, -10, 0, 30); btn.Text = text
-    btn.MouseButton1Click:Connect(func)
+local function createToggle(name, callback)
+    local btn = Instance.new("TextButton", MainFrame)
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.Text = name
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    local toggled = false
+    btn.MouseButton1Click:Connect(function()
+        toggled = not toggled
+        btn.BackgroundColor3 = toggled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
+        callback(toggled)
+    end)
 end
 
-addButton("Toggle Fly", function() States.Fly = not States.Fly end)
-createInput("Fly Speed", 50, function(v) States.FlySpeed = v end)
-addButton("Toggle NoClip", function() States.NoClip = not States.NoClip end)
-addButton("Speed: 16", function() LocalPlayer.Character.Humanoid.WalkSpeed = 16 end)
-createInput("Set Speed", 16, function(v) LocalPlayer.Character.Humanoid.WalkSpeed = v end)
+-- [FITUR UTAMA]
 
--- DROPDOWN PLAYER
-local Dropdown = Instance.new("TextButton", MainFrame); Dropdown.Text = "Pilih Player (Klik)"
-Dropdown.Size = UDim2.new(1, -10, 0, 30)
-Dropdown.MouseButton1Click:Connect(function()
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            addButton("TP ke " .. p.Name, function() 
-                LocalPlayer.Character.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame 
-            end)
-            addButton("Nempel " .. p.Name, function() States.Nempel = p end)
-        end
+-- 1. Fly dengan Kecepatan Custom
+local flySpeed = 50
+createInput("Fly Speed (Angka)", function(val) flySpeed = tonumber(val) or 50 end)
+createToggle("Fly", function(state)
+    if state then
+        local bv = Instance.new("BodyVelocity", LP.Character.HumanoidRootPart); bv.Name = "FlyVel"
+        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        RunService.RenderStepped:Connect(function()
+            if LP.Character and LP.Character:FindFirstChild("FlyVel") then
+                bv.Velocity = workspace.CurrentCamera.CFrame.LookVector * flySpeed
+            end
+        end)
+    else
+        if LP.Character.HumanoidRootPart:FindFirstChild("FlyVel") then LP.Character.HumanoidRootPart.FlyVel:Destroy() end
     end
 end)
 
-addButton("Stop Nempel/Grab", function() States.Nempel = nil; States.Grab = nil end)
-
--- GRAB (Tali)
-addButton("Grab (Klik Player)", function()
-    local conn; conn = Mouse.Button1Down:Connect(function()
-        local target = Mouse.Target and Mouse.Target.Parent:FindFirstChild("Humanoid")
-        if target then
-            States.Grab = target.Parent
-            local rope = Instance.new("RopeConstraint", LocalPlayer.Character.HumanoidRootPart)
-            rope.Attachment0 = Instance.new("Attachment", LocalPlayer.Character.HumanoidRootPart)
-            rope.Attachment1 = Instance.new("Attachment", target.Parent.HumanoidRootPart)
-            rope.Visible = true; rope.Length = 5
+-- 2. NoClip
+createToggle("NoClip", function(state)
+    RunService.Stepped:Connect(function()
+        if state and LP.Character then
+            for _,v in pairs(LP.Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = false end end
         end
-        conn:Disconnect()
     end)
 end)
+
+-- 3. Speed & Jump
+createInput("WalkSpeed (Angka)", function(val) LP.Character.Humanoid.WalkSpeed = tonumber(val) end)
+createInput("JumpPower (Angka)", function(val) LP.Character.Humanoid.UseJumpPower = true; LP.Character.Humanoid.JumpPower = tonumber(val) end)
+
+-- 4. Teleport ke Player (Dropdown Sederhana)
+local targetPlayer = nil
+local TPBtn = Instance.new("TextButton", MainFrame)
+TPBtn.Size = UDim2.new(0.9, 0, 0, 35); TPBtn.Text = "Pilih Target (Klik)"
+TPBtn.MouseButton1Click:Connect(function()
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LP then targetPlayer = plr; TPBtn.Text = "TP ke: " .. plr.Name; break end
+    end
+end)
+TPBtn.MouseButton2Click:Connect(function()
+    if targetPlayer then LP.Character.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame end
+end)
+
+-- 5. Nempel (Belakang Player)
+local stick = false
+createToggle("Nempel (Belakang)", function(state)
+    stick = state
+    RunService.RenderStepped:Connect(function()
+        if stick and targetPlayer and targetPlayer.Character then
+            LP.Character.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 2)
+        end
+    end)
+end)
+
+-- 6. Grab (Tali/Weld)
+createToggle("Grab Player (Klik target)", function(state)
+    if state then
+        LP:GetMouse().Button1Down:Connect(function()
+            local target = LP:GetMouse().Target
+            if target and target.Parent:FindFirstChild("Humanoid") then
+                local weld = Instance.new("Weld", LP.Character.HumanoidRootPart)
+                weld.Part0 = LP.Character.HumanoidRootPart
+                weld.Part1 = target.Parent.HumanoidRootPart
+                weld.Name = "GrabWeld"
+            end
+        end)
+    else
+        for _,v in pairs(LP.Character.HumanoidRootPart:GetChildren()) do if v.Name == "GrabWeld" then v:Destroy() end end
+    end
+end)
+
+-- Toggle Menu
+local ToggleBtn = Instance.new("TextButton", ScreenGui)
+ToggleBtn.Size = UDim2.new(0, 100, 0, 40); ToggleBtn.Position = UDim2.new(0, 10, 0.5, -20)
+ToggleBtn.Text = "UI"; ToggleBtn.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
