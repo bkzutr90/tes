@@ -1,6 +1,6 @@
 --[[ 
     Advanced Universal Admin Panel
-    Arsitektur: Modular, Clean UI, Input-Driven
+    Arsitektur: Modular, Clean UI, Input-Drivennnn
 ]]
 
 local Players = game:GetService("Players")
