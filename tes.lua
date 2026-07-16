@@ -1,79 +1,78 @@
---[[ 
-    Universal Admin Panel v2.0
-    Status: Modular & Clean
-]]
-
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
 
--- 1. Setup Container Utama
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "AdminPanel_UI"
-ScreenGui.Parent = CoreGui -- Delta mendukung CoreGui
+-- 1. Membuat Container Utama
+local ScreenGui = Instance.new("ScreenGui", CoreGui)
+ScreenGui.Name = "AdminPanelUI"
+ScreenGui.ResetOnSpawn = false
 
--- 2. Toggle Button (Untuk membuka/tutup panel)
-local ToggleBtn = Instance.new("TextButton", ScreenGui)
-ToggleBtn.Name = "ToggleBtn"
-ToggleBtn.Position = UDim2.new(0, 10, 0, 100)
-ToggleBtn.Size = UDim2.new(0, 100, 0, 40)
-ToggleBtn.Text = "MENU"
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-
--- 3. Main Panel (Panel Utama)
+-- 2. Membuat Frame Utama (Panel)
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 250, 0, 350)
 MainFrame.Position = UDim2.new(0.5, -125, 0.5, -175)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-MainFrame.Visible = false -- Default disembunyikan
-MainFrame.Draggable = true -- Bisa didrag
+MainFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+MainFrame.BorderSizePixel = 0
+MainFrame.Visible = false -- Mulai dalam keadaan tertutup
+MainFrame.Active = true
+MainFrame.Draggable = true -- Membuat panel bisa di-drag
 
--- Judul Panel
-local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "ADMIN PANEL"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.BackgroundTransparency = 1
+-- Menambahkan sedikit desain agar tidak polos
+local UICorner = Instance.new("UICorner", MainFrame)
+UICorner.CornerRadius = UDim.new(0, 10)
 
--- Layout List agar rapi
-local Layout = Instance.new("UIListLayout", MainFrame)
-Layout.Padding = UDimConfig.new(0, 10)
-Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+-- 3. Membuat Tombol Toggle (Untuk membuka/menutup panel)
+local ToggleButton = Instance.new("TextButton", ScreenGui)
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Size = UDim2.new(0, 100, 0, 40)
+ToggleButton.Position = UDim2.new(0.1, 0, 0.1, 0)
+ToggleButton.Text = "Toggle Menu"
+ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+ToggleButton.TextColor3 = Color3.new(1, 1, 1)
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.FontSize = Enum.FontSize.Size18
 
--- 4. Fungsi Toggle
-ToggleBtn.MouseButton1Click:Connect(function()
+local ToggleCorner = Instance.new("UICorner", ToggleButton)
+ToggleCorner.CornerRadius = UDim.new(0, 8)
+
+-- Fungsi Toggle
+ToggleButton.MouseButton1Click:Connect(function()
     MainFrame.Visible = not MainFrame.Visible
 end)
 
--- 5. Fungsi Helper Tombol
-local function createButton(name, callback)
-    local btn = Instance.new("TextButton", MainFrame)
-    btn.Size = UDim2.new(0.9, 0, 0, 35)
-    btn.Text = name
-    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.MouseButton1Click:Connect(callback)
-    return btn
-end
+-- 4. Contoh Menambahkan Konten di dalam Frame
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Text = "ADMIN PANEL"
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.Bold
 
--- 6. Implementasi Fitur Dasar
-createButton("Toggle Fly", function()
-    print("Fly Toggled")
-    -- Tambahkan logic fly Anda di sini
-end)
+local FlyButton = Instance.new("TextButton", MainFrame)
+FlyButton.Text = "Toggle Fly"
+FlyButton.Size = UDim2.new(0.8, 0, 0, 40)
+FlyButton.Position = UDim2.new(0.1, 0, 0.2, 0)
+FlyButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+FlyButton.TextColor3 = Color3.new(1, 1, 1)
 
-createButton("NoClip", function()
-    -- Logic NoClip: Loop set CanCollide = false
-    LocalPlayer.Character.HumanoidRootPart.CanCollide = false
-end)
-
--- Anti-Delete Protection (Opsional untuk stabilitas)
-task.spawn(function()
-    while task.wait(1) do
-        if not ScreenGui.Parent then
-            ScreenGui.Parent = CoreGui
+-- Logika Fly Sederhana
+local Flying = false
+FlyButton.MouseButton1Click:Connect(function()
+    Flying = not Flying
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    
+    if hrp then
+        if Flying then
+            local bv = Instance.new("BodyVelocity", hrp)
+            bv.Name = "FlyVelocity"
+            bv.Velocity = Vector3.new(0, 0, 0)
+            bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        else
+            if hrp:FindFirstChild("FlyVelocity") then hrp.FlyVelocity:Destroy() end
         end
     end
 end)
+
+print("Admin Panel Berhasil Dimuat!")
