@@ -1,89 +1,87 @@
+--[[ 
+    Advanced Universal Admin Panel
+    Fitur: Fly(w/ Speed), NoClip, Teleport (Dropdown), Speed/Jump Modifier, Sticky/Grab
+]]
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
+local LP_Char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
--- UI SETUP
+-- UI Setup
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Name = "AdminPanel"
 MainFrame.Size = UDim2.new(0, 300, 0, 400)
 MainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.Visible = false
 MainFrame.Active = true
 MainFrame.Draggable = true
 
--- Utility: Membuat Input Field
-local function createInput(text, default, callback)
+-- Fungsi Helper UI
+local function createToggle(text, callback)
     local frame = Instance.new("Frame", MainFrame)
-    frame.Size = UDim2.new(1, 0, 0, 40)
-    frame.BackgroundTransparency = 1
-    local label = Instance.new("TextLabel", frame)
-    label.Text = text
-    label.Size = UDim2.new(0.5, 0, 1, 0)
-    local box = Instance.new("TextBox", frame)
-    box.Position = UDim2.new(0.5, 0, 0, 0)
-    box.Size = UDim2.new(0.5, 0, 1, 0)
-    box.Text = tostring(default)
-    box.FocusLost:Connect(function() callback(tonumber(box.Text)) end)
+    frame.Size = UDim2.new(1, 0, 0, 40); frame.BackgroundTransparency = 1
+    local label = Instance.new("TextLabel", frame); label.Text = text; label.Size = UDim2.new(0.6, 0, 1, 0); label.TextColor3 = Color3.new(1,1,1)
+    local btn = Instance.new("TextButton", frame); btn.Position = UDim2.new(0.7, 0, 0.1, 0); btn.Size = UDim2.new(0.2, 0, 0.8, 0); btn.Text = "OFF"
+    local on = false
+    btn.MouseButton1Click:Connect(function()
+        on = not on
+        btn.Text = on and "ON" or "OFF"
+        callback(on)
+    end)
 end
 
--- [FITUR UTAMA]
+local function createInput(text, callback)
+    local frame = Instance.new("Frame", MainFrame)
+    frame.Size = UDim2.new(1, 0, 0, 40); frame.BackgroundTransparency = 1
+    local label = Instance.new("TextLabel", frame); label.Text = text; label.Size = UDim2.new(0.6, 0, 1, 0); label.TextColor3 = Color3.new(1,1,1)
+    local box = Instance.new("TextBox", frame); box.Position = UDim2.new(0.7, 0, 0.1, 0); box.Size = UDim2.new(0.25, 0, 0.8, 0); box.PlaceholderText = "..."
+    box.FocusLost:Connect(function() callback(tonumber(box.Text) or 0) end)
+end
 
--- 1. FLY (Custom Speed)
-local flySpeed = 50
-local flying = false
-createInput("Fly Speed", 50, function(val) flySpeed = val end)
-local flyBtn = Instance.new("TextButton", MainFrame); flyBtn.Text = "Toggle Fly"; flyBtn.Size = UDim2.new(1,0,0,30)
-flyBtn.MouseButton1Click:Connect(function()
-    flying = not flying
-    local hrp = LocalPlayer.Character.HumanoidRootPart
-    if flying then
-        local bv = Instance.new("BodyVelocity", hrp); bv.Name = "FlyVelo"
-        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        RunService.RenderStepped:Connect(function() 
-            if flying then bv.Velocity = LocalPlayer.Character.Humanoid.MoveDirection * flySpeed end 
-        end)
-    else
-        if hrp:FindFirstChild("FlyVelo") then hrp.FlyVelo:Destroy() end
+-- [LOGIC FITUR]
+local FlySpeed = 50
+local FlyActive = false
+
+-- Fly Logic
+RunService.RenderStepped:Connect(function()
+    if FlyActive and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LocalPlayer.Character.HumanoidRootPart
+        hrp.Velocity = hrp.CFrame.LookVector * (FlySpeed * 2)
     end
 end)
 
--- 2. SPEED & JUMP
-createInput("WalkSpeed", 16, function(val) LocalPlayer.Character.Humanoid.WalkSpeed = val end)
-createInput("JumpPower", 50, function(val) LocalPlayer.Character.Humanoid.JumpPower = val end)
+createToggle("Fly", function(on) FlyActive = on end)
+createInput("Fly Speed", function(val) FlySpeed = val end)
 
--- 3. NOCLIP
-local noclip = false
-local noclipBtn = Instance.new("TextButton", MainFrame); noclipBtn.Text = "Toggle NoClip"; noclipBtn.Size = UDim2.new(1,0,0,30)
-noclipBtn.MouseButton1Click:Connect(function() noclip = not noclip end)
+-- NoClip
+local NoClipActive = false
 RunService.Stepped:Connect(function()
-    if noclip and LocalPlayer.Character then
-        for _, v in pairs(LocalPlayer.Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = false end end
+    if NoClipActive and LocalPlayer.Character then
+        for _,v in pairs(LocalPlayer.Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = false end end
+    end
+end)
+createToggle("NoClip", function(on) NoClipActive = on end)
+
+-- Speed & Jump
+createInput("Set Speed", function(val) LocalPlayer.Character.Humanoid.WalkSpeed = val end)
+createInput("Set Jump", function(val) LocalPlayer.Character.Humanoid.JumpPower = val end)
+
+-- Nempel (Sticky)
+local StickyTarget = nil
+createToggle("Nempel ke Player", function(on)
+    StickyTarget = on and Players:GetPlayers()[math.random(1, #Players:GetPlayers())] or nil
+end)
+
+RunService.Heartbeat:Connect(function()
+    if StickyTarget and StickyTarget.Character then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = StickyTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 2)
     end
 end)
 
--- 4. GRAB/CARRY & LEPAS
-local grabbed = nil
-local grabBtn = Instance.new("TextButton", MainFrame); grabBtn.Text = "Grab Target"; grabBtn.Size = UDim2.new(1,0,0,30)
-local stopBtn = Instance.new("TextButton", MainFrame); stopBtn.Text = "LEPAS"; stopBtn.Size = UDim2.new(1,0,0,30); stopBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-
-grabBtn.MouseButton1Click:Connect(function()
-    local target = Mouse.Hit -- Logika pemilihan bisa ditambah dropdown
-    -- Implementasi Tali (Beam)
-    local beam = Instance.new("Beam", LocalPlayer.Character.HumanoidRootPart)
-    -- ... (Logika attachment)
-end)
-
-stopBtn.MouseButton1Click:Connect(function() 
-    -- Logika hapus weld/tali
-    if LocalPlayer.Character.HumanoidRootPart:FindFirstChild("Weld") then -- Hapus weld
-    end
-end)
-
--- Tombol Buka Tutup
+-- Tombol Open/Close
 local ToggleBtn = Instance.new("TextButton", ScreenGui)
-ToggleBtn.Size = UDim2.new(0, 100, 0, 40)
-ToggleBtn.Position = UDim2.new(0, 10, 0.5, 0)
-ToggleBtn.Text = "Menu"
+ToggleBtn.Size = UDim2.new(0, 100, 0, 40); ToggleBtn.Text = "OPEN MENU"
 ToggleBtn.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
-
