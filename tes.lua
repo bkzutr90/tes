@@ -1,127 +1,84 @@
---[[ 
-    Advanced Universal Admin Panel
-    Arsitektur: Modular, Clean UI, Input-Drivennnn
-]]
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local LP = LocalPlayer
 
--- [UI SETUP]
+-- [UI BUILDER - SIMPEL ELEGANT]
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 250, 0, 500)
-MainFrame.Position = UDim2.new(0.5, -125, 0.5, -250)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Visible = false
+MainFrame.Size = UDim2.new(0, 300, 0, 400); MainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25); MainFrame.Visible = false; MainFrame.Draggable = true
 
-local UIList = Instance.new("UIListLayout", MainFrame)
-UIList.Padding = UDim.new(0, 5)
-UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Text = "UNIVERSAL PANEL"; Title.Size = UDim2.new(1, 0, 0, 40); Title.TextColor3 = Color3.new(1,1,1)
 
--- Helper untuk Membuat Elemen UI
-local function createInput(placeholder, callback)
-    local box = Instance.new("TextBox", MainFrame)
-    box.Size = UDim2.new(0.9, 0, 0, 35)
-    box.PlaceholderText = placeholder
-    box.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    box.TextColor3 = Color3.new(1, 1, 1)
-    box.FocusLost:Connect(function(enter) if enter then callback(box.Text) end end)
-    return box
+local Container = Instance.new("ScrollingFrame", MainFrame)
+Container.Size = UDim2.new(1, 0, 1, -40); Container.Position = UDim2.new(0, 0, 0, 40)
+Container.BackgroundTransparency = 1
+
+-- [ENGINE LOGIC]
+local Engine = { Flying = false, Noclip = false, Following = nil, Speed = 16, Jump = 50 }
+
+-- FLY ENGINE
+local function ToggleFly(val)
+    Engine.Flying = val
+    local hrp = LocalPlayer.Character.HumanoidRootPart
+    if val then
+        local bv = Instance.new("BodyVelocity", hrp); bv.Name = "FlyVel"
+        bv.MaxForce = Vector3.new(9e9, 9e9, 9e9); bv.Velocity = Vector3.zero
+        local bg = Instance.new("BodyGyro", hrp); bg.Name = "FlyGyro"
+        bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9); bg.CFrame = hrp.CFrame
+    else
+        if hrp:FindFirstChild("FlyVel") then hrp.FlyVel:Destroy() end
+        if hrp:FindFirstChild("FlyGyro") then hrp.FlyGyro:Destroy() end
+    end
 end
 
-local function createToggle(name, callback)
-    local btn = Instance.new("TextButton", MainFrame)
-    btn.Size = UDim2.new(0.9, 0, 0, 35)
-    btn.Text = name
-    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    local toggled = false
-    btn.MouseButton1Click:Connect(function()
-        toggled = not toggled
-        btn.BackgroundColor3 = toggled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
-        callback(toggled)
-    end)
+-- NOCLIP ENGINE
+RunService.Stepped:Connect(function()
+    if Engine.Noclip and LocalPlayer.Character then
+        for _,v in pairs(LocalPlayer.Character:GetDescendants()) do 
+            if v:IsA("BasePart") then v.CanCollide = false end 
+        end
+    end
+end)
+
+-- [KOMPONEN UI GENERATOR]
+local function addToggle(name, callback)
+    local btn = Instance.new("TextButton", Container); btn.Size = UDim2.new(1, -10, 0, 40); btn.Text = name
+    btn.MouseButton1Click:Connect(function() callback(btn) end)
+    Instance.new("UIListLayout", Container)
 end
 
--- [FITUR UTAMA]
+-- [IMPLEMENTASI FITUR SESUAI PERMINTAAN]
+addToggle("Fly: OFF", function(btn)
+    Engine.Flying = not Engine.Flying
+    ToggleFly(Engine.Flying)
+    btn.Text = "Fly: " .. (Engine.Flying and "ON" or "OFF")
+end)
 
--- 1. Fly dengan Kecepatan Custom
-local flySpeed = 50
-createInput("Fly Speed (Angka)", function(val) flySpeed = tonumber(val) or 50 end)
-createToggle("Fly", function(state)
-    if state then
-        local bv = Instance.new("BodyVelocity", LP.Character.HumanoidRootPart); bv.Name = "FlyVel"
-        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        RunService.RenderStepped:Connect(function()
-            if LP.Character and LP.Character:FindFirstChild("FlyVel") then
-                bv.Velocity = workspace.CurrentCamera.CFrame.LookVector * flySpeed
-            end
+addToggle("NoClip: OFF", function(btn)
+    Engine.Noclip = not Engine.Noclip
+    btn.Text = "NoClip: " .. (Engine.Noclip and "ON" or "OFF")
+end)
+
+addToggle("Nempel Belakang Player", function()
+    local target = Players:GetPlayers()[2] -- Ambil player pertama selain diri sendiri
+    if target and target.Character then
+        local connection
+        connection = RunService.RenderStepped:Connect(function()
+            if not Engine.Following then connection:Disconnect(); return end
+            LocalPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
         end)
-    else
-        if LP.Character.HumanoidRootPart:FindFirstChild("FlyVel") then LP.Character.HumanoidRootPart.FlyVel:Destroy() end
+        Engine.Following = connection
     end
 end)
 
--- 2. NoClip
-createToggle("NoClip", function(state)
-    RunService.Stepped:Connect(function()
-        if state and LP.Character then
-            for _,v in pairs(LP.Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = false end end
-        end
-    end)
-end)
-
--- 3. Speed & Jump
-createInput("WalkSpeed (Angka)", function(val) LP.Character.Humanoid.WalkSpeed = tonumber(val) end)
-createInput("JumpPower (Angka)", function(val) LP.Character.Humanoid.UseJumpPower = true; LP.Character.Humanoid.JumpPower = tonumber(val) end)
-
--- 4. Teleport ke Player (Dropdown Sederhana)
-local targetPlayer = nil
-local TPBtn = Instance.new("TextButton", MainFrame)
-TPBtn.Size = UDim2.new(0.9, 0, 0, 35); TPBtn.Text = "Pilih Target (Klik)"
-TPBtn.MouseButton1Click:Connect(function()
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LP then targetPlayer = plr; TPBtn.Text = "TP ke: " .. plr.Name; break end
-    end
-end)
-TPBtn.MouseButton2Click:Connect(function()
-    if targetPlayer then LP.Character.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame end
-end)
-
--- 5. Nempel (Belakang Player)
-local stick = false
-createToggle("Nempel (Belakang)", function(state)
-    stick = state
-    RunService.RenderStepped:Connect(function()
-        if stick and targetPlayer and targetPlayer.Character then
-            LP.Character.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 2)
-        end
-    end)
-end)
-
--- 6. Grab (Tali/Weld)
-createToggle("Grab Player (Klik target)", function(state)
-    if state then
-        LP:GetMouse().Button1Down:Connect(function()
-            local target = LP:GetMouse().Target
-            if target and target.Parent:FindFirstChild("Humanoid") then
-                local weld = Instance.new("Weld", LP.Character.HumanoidRootPart)
-                weld.Part0 = LP.Character.HumanoidRootPart
-                weld.Part1 = target.Parent.HumanoidRootPart
-                weld.Name = "GrabWeld"
-            end
-        end)
-    else
-        for _,v in pairs(LP.Character.HumanoidRootPart:GetChildren()) do if v.Name == "GrabWeld" then v:Destroy() end end
-    end
+addToggle("LEPAS SEMUA (Stop)", function()
+    Engine.Flying = false; ToggleFly(false)
+    Engine.Noclip = false; Engine.Following = nil
+    LocalPlayer.Character.Humanoid.WalkSpeed = 16
 end)
 
 -- Toggle Menu
-local ToggleBtn = Instance.new("TextButton", ScreenGui)
-ToggleBtn.Size = UDim2.new(0, 100, 0, 40); ToggleBtn.Position = UDim2.new(0, 10, 0.5, -20)
-ToggleBtn.Text = "UI"; ToggleBtn.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
+local OpenBtn = Instance.new("TextButton", ScreenGui); OpenBtn.Text = "OPEN"
+OpenBtn.Size = UDim2.new(0, 60, 0, 60); OpenBtn.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
